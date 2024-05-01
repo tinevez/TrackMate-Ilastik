@@ -122,6 +122,20 @@ public class IlastikRunner< T extends RealType< T > & NativeType< T > > implemen
 		lastCalibration = TMUtils.getSpatialCalibration( img );
 
 		/*
+		 * Check if we are properly configured.
+		 */
+
+		final OptionsService optionsService = TMUtils.getContext().getService( OptionsService.class );
+		final IlastikOptions opts = optionsService.getOptions( IlastikOptions.class );
+		opts.load();
+		if ( opts.executableFile == null || !opts.executableFile.exists() )
+		{
+			errorMessage = "The ilastik executable path is not properly set.\n"
+					+ "Please use the 'Plugins > ilastik > Configure ilastik executable location' to set it.\n";
+			return null;
+		}
+
+		/*
 		 * Investigate whether the ilastik model is built on a single channel or
 		 * on multiple channels.
 		 */
@@ -221,7 +235,7 @@ public class IlastikRunner< T extends RealType< T > & NativeType< T > > implemen
 		errorMessage = null;
 		if ( lastOutput == null )
 		{
-			errorMessage = "Probabilities have not been computed yet.";
+			errorMessage = "Probabilities have not been computed yet.\n";
 			return null;
 		}
 		return getSpots( lastOutput, lastCalibration, threshold, simplify, smoothingScale );

@@ -33,6 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import org.ilastik.ilastik4ij.ui.IlastikOptions;
+import org.scijava.options.OptionsService;
+
 import fiji.plugin.trackmate.Logger;
 import fiji.plugin.trackmate.Model;
 import fiji.plugin.trackmate.Settings;
@@ -108,6 +111,20 @@ public class IlastikDetectionPreviewer< T extends RealType< T > & NativeType< T 
 			final String thresholdKey )
 	{
 		final Logger logger = getLogger();
+
+		/*
+		 * Check if we are properly configured.
+		 */
+
+		final OptionsService optionsService = TMUtils.getContext().getService( OptionsService.class );
+		final IlastikOptions opts = optionsService.getOptions( IlastikOptions.class );
+		opts.load();
+		if ( opts.executableFile == null || !opts.executableFile.exists() )
+		{
+			logger.error( "The ilastik executable path is not properly set.\n"
+					+ "Please use the 'Plugins > ilastik > Configure ilastik executable location' to set it.\n" );
+			return null;
+		}
 
 		/*
 		 * Source image (all time-points, possible multi-channels.
@@ -194,10 +211,20 @@ public class IlastikDetectionPreviewer< T extends RealType< T > & NativeType< T 
 		if ( recomputeProba || ilastikRunner == null )
 		{
 			ilastikRunner = new IlastikRunner<>( classifierPath );
-			final RandomAccessibleInterval< T > probabilities = ilastikRunner.computeProbabilities( img, channel, interval, classIndex );
-			if ( probabilities == null )
+			try
 			{
-				logger.error( "Problem computing probabilities: " + ilastikRunner.getErrorMessage() );
+				final RandomAccessibleInterval< T > probabilities = ilastikRunner.computeProbabilities( img, channel, interval, classIndex );
+				if ( probabilities == null )
+				{
+					logger.error( "Problem computing probabilities: " + ilastikRunner.getErrorMessage() );
+					return null;
+				}
+			}
+			catch ( final NullPointerException npe )
+			{
+				logger.error( "Problem computing probabilities:.\n"
+						+ "Is the ilastik application path properly configured?\n"
+						+ "Current path settingsgs: " + opts.executableFile );
 				return null;
 			}
 		}
