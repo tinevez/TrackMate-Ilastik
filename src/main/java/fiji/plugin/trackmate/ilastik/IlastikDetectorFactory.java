@@ -30,6 +30,7 @@ import static fiji.plugin.trackmate.io.IOUtils.readStringAttribute;
 import static fiji.plugin.trackmate.io.IOUtils.writeAttribute;
 import static fiji.plugin.trackmate.io.IOUtils.writeTargetChannel;
 import static fiji.plugin.trackmate.util.TMUtils.checkMapKeys;
+import static fiji.plugin.trackmate.util.TMUtils.checkOptionalParameter;
 import static fiji.plugin.trackmate.util.TMUtils.checkParameter;
 
 import java.util.ArrayList;
@@ -187,6 +188,7 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		ok = ok && writeAttribute( settings, element, KEY_CLASSIFIER_FILEPATH, String.class, errorHolder );
 		ok = ok && writeAttribute( settings, element, KEY_CLASS_INDEX, Integer.class, errorHolder );
 		ok = ok && writeAttribute( settings, element, KEY_PROBA_THRESHOLD, Double.class, errorHolder );
+		ok = ok && writeAttribute( settings, element, KEY_SMOOTHING_SCALE, Double.class, errorHolder );
 
 		if ( !ok )
 			errorMessage = errorHolder.toString();
@@ -204,6 +206,7 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		ok = ok && readStringAttribute( element, settings, KEY_CLASSIFIER_FILEPATH, errorHolder );
 		ok = ok && readIntegerAttribute( element, settings, KEY_CLASS_INDEX, errorHolder );
 		ok = ok && readDoubleAttribute( element, settings, KEY_PROBA_THRESHOLD, errorHolder );
+		ok = ok & readDoubleAttribute( element, settings, KEY_SMOOTHING_SCALE, errorHolder );
 
 		if ( !ok )
 		{
@@ -227,6 +230,7 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		settings.put( KEY_CLASSIFIER_FILEPATH, "" );
 		settings.put( KEY_CLASS_INDEX, DEFAULT_CLASS_INDEX );
 		settings.put( KEY_PROBA_THRESHOLD, DEFAULT_PROBA_THRESHOLD );
+		settings.put( KEY_SMOOTHING_SCALE, -1. );
 		return settings;
 	}
 
@@ -239,12 +243,15 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		ok = ok & checkParameter( settings, KEY_CLASSIFIER_FILEPATH, String.class, errorHolder );
 		ok = ok & checkParameter( settings, KEY_CLASS_INDEX, Integer.class, errorHolder );
 		ok = ok & checkParameter( settings, KEY_PROBA_THRESHOLD, Double.class, errorHolder );
+		ok = ok & checkOptionalParameter( settings, KEY_SMOOTHING_SCALE, Double.class, errorHolder );
 		final List< String > mandatoryKeys = new ArrayList<>();
 		mandatoryKeys.add( KEY_TARGET_CHANNEL );
 		mandatoryKeys.add( KEY_CLASSIFIER_FILEPATH );
 		mandatoryKeys.add( KEY_CLASS_INDEX );
 		mandatoryKeys.add( KEY_PROBA_THRESHOLD );
-		ok = ok & checkMapKeys( settings, mandatoryKeys, null, errorHolder );
+		final List< String > optionalKeys = new ArrayList<>();
+		optionalKeys.add( KEY_SMOOTHING_SCALE );
+		ok = ok & checkMapKeys( settings, mandatoryKeys, optionalKeys, errorHolder );
 		if ( !ok )
 			errorMessage = errorHolder.toString();
 

@@ -22,6 +22,7 @@
 package fiji.plugin.trackmate.ilastik;
 
 import static fiji.plugin.trackmate.detection.DetectorKeys.KEY_TARGET_CHANNEL;
+import static fiji.plugin.trackmate.detection.ThresholdDetectorFactory.KEY_SMOOTHING_SCALE;
 import static fiji.plugin.trackmate.gui.Fonts.BIG_FONT;
 import static fiji.plugin.trackmate.gui.Fonts.FONT;
 import static fiji.plugin.trackmate.gui.Fonts.SMALL_FONT;
@@ -59,6 +60,7 @@ import org.scijava.prefs.PrefService;
 import fiji.plugin.trackmate.Model;
 import fiji.plugin.trackmate.Settings;
 import fiji.plugin.trackmate.gui.GuiUtils;
+import fiji.plugin.trackmate.gui.components.PanelSmoothContour;
 import fiji.plugin.trackmate.util.FileChooser;
 import fiji.plugin.trackmate.util.FileChooser.DialogType;
 import fiji.plugin.trackmate.util.TMUtils;
@@ -83,11 +85,14 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 
 	private final JFormattedTextField ftfProbaThreshold;
 
+	private final PanelSmoothContour smoothingPanel;
+
 	protected final PrefService prefService;
 
 	private final JSpinner spinner;
 
 	private final IlastikDetectionPreviewer< ? > previewer;
+
 
 	/**
 	 * Creates the panel.
@@ -248,6 +253,20 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		add( ftfProbaThreshold, gbcScore );
 
 		/*
+		 * Smooth output.
+		 */
+
+		smoothingPanel = new PanelSmoothContour( -1., model.getSpaceUnits() );
+		final GridBagConstraints gbSmoothPanel = new GridBagConstraints();
+		gbSmoothPanel.anchor = GridBagConstraints.NORTHWEST;
+		gbSmoothPanel.insets = new Insets( 5, 5, 5, 5 );
+		gbSmoothPanel.gridwidth = 3;
+		gbSmoothPanel.gridx = 0;
+		gbSmoothPanel.gridy = 7;
+		gbSmoothPanel.fill = GridBagConstraints.HORIZONTAL;
+		this.add( smoothingPanel, gbSmoothPanel );
+
+		/*
 		 * View last proba.
 		 */
 
@@ -259,7 +278,7 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		gbcBtnLastProba.anchor = GridBagConstraints.SOUTHEAST;
 		gbcBtnLastProba.insets = new Insets( 5, 5, 5, 5 );
 		gbcBtnLastProba.gridx = 1;
-		gbcBtnLastProba.gridy = 7;
+		gbcBtnLastProba.gridy = 8;
 		add( btnLastProba, gbcBtnLastProba );
 
 		/*
@@ -277,7 +296,7 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		gbcBtnPreview.fill = GridBagConstraints.BOTH;
 		gbcBtnPreview.insets = new Insets( 5, 5, 5, 5 );
 		gbcBtnPreview.gridx = 0;
-		gbcBtnPreview.gridy = 9;
+		gbcBtnPreview.gridy = 10;
 		add( previewer.getPanel(), gbcBtnPreview );
 
 		/*
@@ -327,6 +346,10 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 
 		final double probaThreshold = ( ( Number ) ftfProbaThreshold.getValue() ).doubleValue();
 		settings.put( KEY_PROBA_THRESHOLD, probaThreshold );
+
+		final double scale = smoothingPanel.getScale();
+		settings.put( KEY_SMOOTHING_SCALE, scale );
+
 		return settings;
 	}
 
@@ -347,6 +370,9 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 
 		ftfProbaThreshold.setValue( settings.get( KEY_PROBA_THRESHOLD ) );
 
+		final Object scaleObj = settings.get( KEY_SMOOTHING_SCALE );
+		final double scale = scaleObj == null ? -1. : ( ( Number ) scaleObj ).doubleValue();
+		smoothingPanel.setScale( scale );
 	}
 
 	@Override
