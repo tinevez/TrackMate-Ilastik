@@ -31,20 +31,16 @@ import static fiji.plugin.trackmate.ilastik.IlastikDetectorFactory.KEY_CLASSIFIE
 import static fiji.plugin.trackmate.ilastik.IlastikDetectorFactory.KEY_CLASS_INDEX;
 import static fiji.plugin.trackmate.ilastik.IlastikDetectorFactory.KEY_PROBA_THRESHOLD;
 
-import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.swing.JButton;
-import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JSlider;
 import javax.swing.JSpinner;
@@ -60,6 +56,7 @@ import org.scijava.prefs.PrefService;
 import fiji.plugin.trackmate.Model;
 import fiji.plugin.trackmate.Settings;
 import fiji.plugin.trackmate.gui.GuiUtils;
+import fiji.plugin.trackmate.gui.components.PanelProbaThreshold;
 import fiji.plugin.trackmate.gui.components.PanelSmoothContour;
 import fiji.plugin.trackmate.util.FileChooser;
 import fiji.plugin.trackmate.util.FileChooser.DialogType;
@@ -71,8 +68,6 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 
 	private static final long serialVersionUID = 1L;
 
-	private static final NumberFormat THRESHOLD_FORMAT = new DecimalFormat( "#.##" );
-
 	private static final String TITLE = IlastikDetectorFactory.NAME;
 
 	private static final FileFilter fileFilter = new FileNameExtensionFilter( "ilastik project files.", "ilp" );
@@ -83,7 +78,7 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 
 	private final JButton btnBrowse;
 
-	private final JFormattedTextField ftfProbaThreshold;
+	private final PanelProbaThreshold probaThresholdPanel;
 
 	private final PanelSmoothContour smoothingPanel;
 
@@ -232,25 +227,15 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		 * Proba threshold.
 		 */
 
-		final JLabel lblScoreTreshold = new JLabel( "Threshold on probability:" );
-		lblScoreTreshold.setFont( SMALL_FONT );
-		final GridBagConstraints gbcLblScoreTreshold = new GridBagConstraints();
-		gbcLblScoreTreshold.anchor = GridBagConstraints.EAST;
-		gbcLblScoreTreshold.insets = new Insets( 5, 5, 5, 5 );
-		gbcLblScoreTreshold.gridx = 0;
-		gbcLblScoreTreshold.gridy = 6;
-		add( lblScoreTreshold, gbcLblScoreTreshold );
-
-		ftfProbaThreshold = new JFormattedTextField( THRESHOLD_FORMAT );
-		ftfProbaThreshold.setFont( SMALL_FONT );
-		ftfProbaThreshold.setMinimumSize( new Dimension( 60, 20 ) );
-		ftfProbaThreshold.setHorizontalAlignment( SwingConstants.CENTER );
+		probaThresholdPanel = new PanelProbaThreshold( 0.5 );
 		final GridBagConstraints gbcScore = new GridBagConstraints();
 		gbcScore.fill = GridBagConstraints.HORIZONTAL;
+		gbcScore.anchor = GridBagConstraints.NORTHWEST;
 		gbcScore.insets = new Insets( 5, 5, 5, 5 );
-		gbcScore.gridx = 1;
+		gbcScore.gridwidth = 3;
+		gbcScore.gridx = 0;
 		gbcScore.gridy = 6;
-		add( ftfProbaThreshold, gbcScore );
+		add( probaThresholdPanel, gbcScore );
 
 		/*
 		 * Smooth output.
@@ -344,7 +329,7 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		final int classID = model.getList().indexOf( spinner.getValue() );
 		settings.put( KEY_CLASS_INDEX, classID );
 
-		final double probaThreshold = ( ( Number ) ftfProbaThreshold.getValue() ).doubleValue();
+		final double probaThreshold = probaThresholdPanel.getThreshold();
 		settings.put( KEY_PROBA_THRESHOLD, probaThreshold );
 
 		final double scale = smoothingPanel.getScale();
@@ -368,7 +353,9 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		final int classID = ( Integer ) settings.get( KEY_CLASS_INDEX );
 		spinner.setValue( model.getList().get( classID ) );
 
-		ftfProbaThreshold.setValue( settings.get( KEY_PROBA_THRESHOLD ) );
+		final Object thresholdObj = settings.get( KEY_PROBA_THRESHOLD );
+		final double threshold = thresholdObj == null ? 0.5 : ( ( Number ) thresholdObj ).doubleValue();
+		probaThresholdPanel.setThreshold( threshold );
 
 		final Object scaleObj = settings.get( KEY_SMOOTHING_SCALE );
 		final double scale = scaleObj == null ? -1. : ( ( Number ) scaleObj ).doubleValue();
