@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import fiji.plugin.trackmate.detection.DetectorKeys;
+import fiji.plugin.trackmate.gui.GuiUtils;
 import fiji.plugin.trackmate.ilastik.IlastikDetectorFactory;
 import ij.IJ;
 import ij.ImageJ;
@@ -37,6 +38,8 @@ public class TrackMateIlastikTestDrive
 
 	public static void main( final String[] args ) throws IOException
 	{
+		GuiUtils.setSystemLookAndFeel();
+
 		final File root = new File( "/Users/tinevez/Google Drive/Cours/Gothenburg-CCI-course-Sept2023/GothenburgCCICourse-Day4-datasets/IlastikTutorialMaterial" );
 
 		// 2D+T
