@@ -22,27 +22,25 @@
 package fiji.plugin.trackmate.ilastik;
 
 import static fiji.plugin.trackmate.detection.DetectorKeys.KEY_TARGET_CHANNEL;
+import static fiji.plugin.trackmate.detection.ThresholdDetectorFactory.KEY_SMOOTHING_SCALE;
 import static fiji.plugin.trackmate.gui.Fonts.BIG_FONT;
 import static fiji.plugin.trackmate.gui.Fonts.FONT;
 import static fiji.plugin.trackmate.gui.Fonts.SMALL_FONT;
+import static fiji.plugin.trackmate.gui.Icons.MAGNIFIER_ICON;
 import static fiji.plugin.trackmate.ilastik.IlastikDetectorFactory.KEY_CLASSIFIER_FILEPATH;
 import static fiji.plugin.trackmate.ilastik.IlastikDetectorFactory.KEY_CLASS_INDEX;
 import static fiji.plugin.trackmate.ilastik.IlastikDetectorFactory.KEY_PROBA_THRESHOLD;
 
-import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.swing.JButton;
-import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JSlider;
 import javax.swing.JSpinner;
@@ -58,17 +56,17 @@ import org.scijava.prefs.PrefService;
 import fiji.plugin.trackmate.Model;
 import fiji.plugin.trackmate.Settings;
 import fiji.plugin.trackmate.gui.GuiUtils;
-import fiji.plugin.trackmate.util.DetectionPreview;
+import fiji.plugin.trackmate.gui.components.PanelProbaThreshold;
+import fiji.plugin.trackmate.gui.components.PanelSmoothContour;
 import fiji.plugin.trackmate.util.FileChooser;
 import fiji.plugin.trackmate.util.FileChooser.DialogType;
 import fiji.plugin.trackmate.util.TMUtils;
+import ij.ImagePlus;
 
 public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfigurationPanel
 {
 
 	private static final long serialVersionUID = 1L;
-
-	private static final NumberFormat THRESHOLD_FORMAT = new DecimalFormat( "#.##" );
 
 	private static final String TITLE = IlastikDetectorFactory.NAME;
 
@@ -80,11 +78,16 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 
 	private final JButton btnBrowse;
 
-	private final JFormattedTextField ftfProbaThreshold;
+	private final PanelProbaThreshold probaThresholdPanel;
+
+	private final PanelSmoothContour smoothingPanel;
 
 	protected final PrefService prefService;
 
 	private final JSpinner spinner;
+
+	private final IlastikDetectionPreviewer< ? > previewer;
+
 
 	/**
 	 * Creates the panel.
@@ -101,7 +104,7 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 
 		final GridBagLayout gridBagLayout = new GridBagLayout();
 		gridBagLayout.columnWidths = new int[] { 144, 0, 32 };
-		gridBagLayout.rowHeights = new int[] { 0, 0, 0, 27, 0, 0, 0, 0, 37, 23 };
+		gridBagLayout.rowHeights = new int[] { 0, 0, 0, 27, 0, 0, 0, 0, 0, 37, 23 };
 		gridBagLayout.columnWeights = new double[] { 0., 1., 0. };
 		gridBagLayout.rowWeights = new double[] { 0., 1., 0., 0., 0., 0., 0., 0., 0., 0. };
 		setLayout( gridBagLayout );
@@ -224,46 +227,62 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		 * Proba threshold.
 		 */
 
-		final JLabel lblScoreTreshold = new JLabel( "Threshold on probability:" );
-		lblScoreTreshold.setFont( SMALL_FONT );
-		final GridBagConstraints gbcLblScoreTreshold = new GridBagConstraints();
-		gbcLblScoreTreshold.anchor = GridBagConstraints.EAST;
-		gbcLblScoreTreshold.insets = new Insets( 5, 5, 5, 5 );
-		gbcLblScoreTreshold.gridx = 0;
-		gbcLblScoreTreshold.gridy = 6;
-		add( lblScoreTreshold, gbcLblScoreTreshold );
-
-		ftfProbaThreshold = new JFormattedTextField( THRESHOLD_FORMAT );
-		ftfProbaThreshold.setFont( SMALL_FONT );
-		ftfProbaThreshold.setMinimumSize( new Dimension( 60, 20 ) );
-		ftfProbaThreshold.setHorizontalAlignment( SwingConstants.CENTER );
+		probaThresholdPanel = new PanelProbaThreshold( 0.5 );
 		final GridBagConstraints gbcScore = new GridBagConstraints();
 		gbcScore.fill = GridBagConstraints.HORIZONTAL;
+		gbcScore.anchor = GridBagConstraints.NORTHWEST;
 		gbcScore.insets = new Insets( 5, 5, 5, 5 );
-		gbcScore.gridx = 1;
+		gbcScore.gridwidth = 3;
+		gbcScore.gridx = 0;
 		gbcScore.gridy = 6;
-		add( ftfProbaThreshold, gbcScore );
+		add( probaThresholdPanel, gbcScore );
+
+		/*
+		 * Smooth output.
+		 */
+
+		smoothingPanel = new PanelSmoothContour( -1., model.getSpaceUnits() );
+		final GridBagConstraints gbSmoothPanel = new GridBagConstraints();
+		gbSmoothPanel.anchor = GridBagConstraints.NORTHWEST;
+		gbSmoothPanel.insets = new Insets( 5, 5, 5, 5 );
+		gbSmoothPanel.gridwidth = 3;
+		gbSmoothPanel.gridx = 0;
+		gbSmoothPanel.gridy = 7;
+		gbSmoothPanel.fill = GridBagConstraints.HORIZONTAL;
+		this.add( smoothingPanel, gbSmoothPanel );
+
+		/*
+		 * View last proba.
+		 */
+
+		final JButton btnLastProba = new JButton( "Last proba map", MAGNIFIER_ICON );
+		btnLastProba.addActionListener( e -> showProbaImg() );
+		btnLastProba.setFont( FONT );
+		final GridBagConstraints gbcBtnLastProba = new GridBagConstraints();
+		gbcBtnLastProba.gridwidth = 2;
+		gbcBtnLastProba.anchor = GridBagConstraints.SOUTHEAST;
+		gbcBtnLastProba.insets = new Insets( 5, 5, 5, 5 );
+		gbcBtnLastProba.gridx = 1;
+		gbcBtnLastProba.gridy = 8;
+		add( btnLastProba, gbcBtnLastProba );
 
 		/*
 		 * Preview.
 		 */
 
-		final DetectionPreview detectionPreview = DetectionPreview.create()
-				.model( model )
-				.settings( settings )
-				.detectorFactory( getDetectorFactory() )
-				.detectionSettingsSupplier( () -> getSettings() )
-				.frameSupplier( () -> settings.imp.getFrame() - 1 )
-				.axisLabel( "Probability" )
-				.get();
+		previewer = new IlastikDetectionPreviewer<>(
+				model,
+				settings,
+				() -> getSettings(),
+				() -> ( settings.imp.getFrame() - 1 ) );
 		
 		final GridBagConstraints gbcBtnPreview = new GridBagConstraints();
 		gbcBtnPreview.gridwidth = 3;
 		gbcBtnPreview.fill = GridBagConstraints.BOTH;
 		gbcBtnPreview.insets = new Insets( 5, 5, 5, 5 );
 		gbcBtnPreview.gridx = 0;
-		gbcBtnPreview.gridy = 8;
-		add( detectionPreview.getPanel(), gbcBtnPreview );
+		gbcBtnPreview.gridy = 10;
+		add( previewer.getPanel(), gbcBtnPreview );
 
 		/*
 		 * Deal with channels: the slider and channel labels are only visible if
@@ -310,8 +329,12 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		final int classID = model.getList().indexOf( spinner.getValue() );
 		settings.put( KEY_CLASS_INDEX, classID );
 
-		final double probaThreshold = ( ( Number ) ftfProbaThreshold.getValue() ).doubleValue();
+		final double probaThreshold = probaThresholdPanel.getThreshold();
 		settings.put( KEY_PROBA_THRESHOLD, probaThreshold );
+
+		final double scale = smoothingPanel.getScale();
+		settings.put( KEY_SMOOTHING_SCALE, scale );
+
 		return settings;
 	}
 
@@ -330,8 +353,13 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		final int classID = ( Integer ) settings.get( KEY_CLASS_INDEX );
 		spinner.setValue( model.getList().get( classID ) );
 
-		ftfProbaThreshold.setValue( settings.get( KEY_PROBA_THRESHOLD ) );
+		final Object thresholdObj = settings.get( KEY_PROBA_THRESHOLD );
+		final double threshold = thresholdObj == null ? 0.5 : ( ( Number ) thresholdObj ).doubleValue();
+		probaThresholdPanel.setThreshold( threshold );
 
+		final Object scaleObj = settings.get( KEY_SMOOTHING_SCALE );
+		final double scale = scaleObj == null ? -1. : ( ( Number ) scaleObj ).doubleValue();
+		smoothingPanel.setScale( scale );
 	}
 
 	@Override
@@ -362,6 +390,12 @@ public class IlastikDetectorConfigurationPanel extends IlastikDetectorBaseConfig
 		{
 			btnBrowse.setEnabled( true );
 		}
+	}
+
+	private void showProbaImg()
+	{
+		final ImagePlus proba = previewer.getLastProbabilityImage();
+		proba.show();
 	}
 
 	private void refreshLabelNames()

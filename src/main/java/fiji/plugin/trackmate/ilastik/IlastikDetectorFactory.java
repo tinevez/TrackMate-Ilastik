@@ -8,12 +8,12 @@
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public
  * License along with this program.  If not, see
  * <http://www.gnu.org/licenses/gpl-3.0.html>.
@@ -23,12 +23,14 @@ package fiji.plugin.trackmate.ilastik;
 
 import static fiji.plugin.trackmate.detection.DetectorKeys.DEFAULT_TARGET_CHANNEL;
 import static fiji.plugin.trackmate.detection.DetectorKeys.KEY_TARGET_CHANNEL;
+import static fiji.plugin.trackmate.detection.ThresholdDetectorFactory.KEY_SMOOTHING_SCALE;
 import static fiji.plugin.trackmate.io.IOUtils.readDoubleAttribute;
 import static fiji.plugin.trackmate.io.IOUtils.readIntegerAttribute;
 import static fiji.plugin.trackmate.io.IOUtils.readStringAttribute;
 import static fiji.plugin.trackmate.io.IOUtils.writeAttribute;
 import static fiji.plugin.trackmate.io.IOUtils.writeTargetChannel;
 import static fiji.plugin.trackmate.util.TMUtils.checkMapKeys;
+import static fiji.plugin.trackmate.util.TMUtils.checkOptionalParameter;
 import static fiji.plugin.trackmate.util.TMUtils.checkParameter;
 
 import java.util.ArrayList;
@@ -39,6 +41,7 @@ import java.util.Map;
 import javax.swing.ImageIcon;
 
 import org.jdom2.Element;
+import org.scijava.Priority;
 import org.scijava.plugin.Plugin;
 
 import fiji.plugin.trackmate.Model;
@@ -53,7 +56,7 @@ import net.imglib2.Interval;
 import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 
-@Plugin( type = SpotDetectorFactory.class )
+@Plugin( type = SpotDetectorFactory.class, priority = Priority.LOW - 4. )
 public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > > implements SpotGlobalDetectorFactory< T >
 {
 
@@ -92,7 +95,7 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 	public static final String INFO_TEXT = "<html>"
 			+ "This detector relies on ilastik to detect objects."
 			+ "<p>"
-			+ "It only works for 2D images."
+			+ "It works for 2D and 3D images."
 			+ "And for this detector to work, the 'ilastik' update site "
 			+ "must be activated in your Fiji installation. "
 			+ "You also need to properly configure the Ilastik Fiji plugin."
@@ -137,6 +140,10 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		final double probaThreshold = ( Double ) settings.get( KEY_PROBA_THRESHOLD );
 		// In ImgLib2, dimensions are 0-based.
 		final int channel = ( Integer ) settings.get( KEY_TARGET_CHANNEL ) - 1;
+		final Object smoothingObj = settings.get( KEY_SMOOTHING_SCALE );
+		final double smoothingScale = smoothingObj == null
+				? -1.
+				: ( ( Number ) smoothingObj ).doubleValue();
 
 		final IlastikDetector< T > detector = new IlastikDetector<>(
 				img,
@@ -144,7 +151,8 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 				channel,
 				classifierPath,
 				classIndex,
-				probaThreshold );
+				probaThreshold,
+				smoothingScale );
 		return detector;
 	}
 
@@ -180,6 +188,7 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		ok = ok && writeAttribute( settings, element, KEY_CLASSIFIER_FILEPATH, String.class, errorHolder );
 		ok = ok && writeAttribute( settings, element, KEY_CLASS_INDEX, Integer.class, errorHolder );
 		ok = ok && writeAttribute( settings, element, KEY_PROBA_THRESHOLD, Double.class, errorHolder );
+		ok = ok && writeAttribute( settings, element, KEY_SMOOTHING_SCALE, Double.class, errorHolder );
 
 		if ( !ok )
 			errorMessage = errorHolder.toString();
@@ -197,6 +206,7 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		ok = ok && readStringAttribute( element, settings, KEY_CLASSIFIER_FILEPATH, errorHolder );
 		ok = ok && readIntegerAttribute( element, settings, KEY_CLASS_INDEX, errorHolder );
 		ok = ok && readDoubleAttribute( element, settings, KEY_PROBA_THRESHOLD, errorHolder );
+		ok = ok & readDoubleAttribute( element, settings, KEY_SMOOTHING_SCALE, errorHolder );
 
 		if ( !ok )
 		{
@@ -220,6 +230,7 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		settings.put( KEY_CLASSIFIER_FILEPATH, "" );
 		settings.put( KEY_CLASS_INDEX, DEFAULT_CLASS_INDEX );
 		settings.put( KEY_PROBA_THRESHOLD, DEFAULT_PROBA_THRESHOLD );
+		settings.put( KEY_SMOOTHING_SCALE, -1. );
 		return settings;
 	}
 
@@ -232,12 +243,15 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 		ok = ok & checkParameter( settings, KEY_CLASSIFIER_FILEPATH, String.class, errorHolder );
 		ok = ok & checkParameter( settings, KEY_CLASS_INDEX, Integer.class, errorHolder );
 		ok = ok & checkParameter( settings, KEY_PROBA_THRESHOLD, Double.class, errorHolder );
+		ok = ok & checkOptionalParameter( settings, KEY_SMOOTHING_SCALE, Double.class, errorHolder );
 		final List< String > mandatoryKeys = new ArrayList<>();
 		mandatoryKeys.add( KEY_TARGET_CHANNEL );
 		mandatoryKeys.add( KEY_CLASSIFIER_FILEPATH );
 		mandatoryKeys.add( KEY_CLASS_INDEX );
 		mandatoryKeys.add( KEY_PROBA_THRESHOLD );
-		ok = ok & checkMapKeys( settings, mandatoryKeys, null, errorHolder );
+		final List< String > optionalKeys = new ArrayList<>();
+		optionalKeys.add( KEY_SMOOTHING_SCALE );
+		ok = ok & checkMapKeys( settings, mandatoryKeys, optionalKeys, errorHolder );
 		if ( !ok )
 			errorMessage = errorHolder.toString();
 
@@ -287,6 +301,12 @@ public class IlastikDetectorFactory< T extends RealType< T > & NativeType< T > >
 
 	@Override
 	public boolean has2Dsegmentation()
+	{
+		return true;
+	}
+
+	@Override
+	public boolean has3Dsegmentation()
 	{
 		return true;
 	}
